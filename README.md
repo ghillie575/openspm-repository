@@ -55,7 +55,7 @@ brew install cmake libarchive pkg-config
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/ghillie575/openspm-repository
 cd openspm-repository
 ```
 

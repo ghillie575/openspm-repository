@@ -1,0 +1,129 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake g++ libarchive-dev pkg-config
+        
+    - name: Configure CMake
+      run: |
+        mkdir -p out/build/gcc
+        cd out/build/gcc
+        cmake ../../..
+        
+    - name: Build project
+      run: |
+        cd out/build/gcc
+        cmake --build . --config Release
+        
+    - name: Verify executable
+      run: |
+        ls -lh out/build/gcc/
+        file out/build/gcc/openspm-repo
+        
+    - name: Upload executable artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: openspm-repo-linux-amd64
+        path: out/build/gcc/openspm-repo
+        retention-days: 90
+        
+    - name: Upload README artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: documentation
+        path: README.md
+        retention-days: 90
+
+  build-macos:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Install dependencies
+      run: |
+        brew install cmake libarchive pkg-config
+        
+    - name: Configure CMake
+      run: |
+        mkdir -p out/build/clang
+        cd out/build/clang
+        cmake ../../..
+        
+    - name: Build project
+      run: |
+        cd out/build/clang
+        cmake --build . --config Release
+        
+    - name: Verify executable
+      run: |
+        ls -lh out/build/clang/
+        file out/build/clang/openspm-repo
+        
+    - name: Upload executable artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: openspm-repo-macos-amd64
+        path: out/build/clang/openspm-repo
+        retention-days: 90
+
+  create-release-package:
+    needs: [build-linux, build-macos]
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      
+    - name: Display structure of downloaded files
+      run: ls -R
+      
+    - name: Create release directory
+      run: |
+        mkdir -p release/linux
+        mkdir -p release/macos
+        mkdir -p release/docs
+        
+    - name: Organize artifacts
+      run: |
+        cp openspm-repo-linux-amd64/openspm-repo release/linux/openspm-repo
+        cp openspm-repo-macos-amd64/openspm-repo release/macos/openspm-repo
+        cp documentation/README.md release/docs/README.md
+        cp documentation/README.md release/README.md
+        chmod +x release/linux/openspm-repo
+        chmod +x release/macos/openspm-repo
+        
+    - name: Create platform-specific archives
+      run: |
+        cd release/linux && tar czf ../openspm-repo-linux-amd64.tar.gz openspm-repo
+        cd ../macos && tar czf ../openspm-repo-macos-amd64.tar.gz openspm-repo
+        cd ..
+        
+    - name: Upload combined release package
+      uses: actions/upload-artifact@v4
+      with:
+        name: openspm-repo-release
+        path: |
+          release/*.tar.gz
+          release/README.md
+        retention-days: 90
